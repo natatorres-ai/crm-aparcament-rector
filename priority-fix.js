@@ -39,3 +39,12 @@ mapClientToDb = function mapClientToDb(client) {
     updated_at: new Date().toISOString(),
   };
 };
+
+if (typeof refreshFromSupabase === "function") {
+  setTimeout(() => {
+    refreshFromSupabase().catch((error) => {
+      setConnectionStatus("Error de conexion", "error");
+      showMessage(`No s'ha pogut recarregar Supabase: ${error.message}`);
+    });
+  }, 0);
+}
