@@ -6,6 +6,7 @@
     <title>CRM Aparcament Rector</title>
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
     <script src="./app.js" defer></script>
   </head>
   <body>
@@ -15,11 +16,19 @@
         <h1>CRM d'interessats</h1>
       </div>
       <div class="header-actions">
-        <label class="file-button">Importar clients Excel<input id="clientFile" type="file" accept=".xlsx,.xls,.csv" /></label>
-        <label class="file-button secondary">Importar places/trasters<input id="unitFile" type="file" accept=".xlsx,.xls,.csv" /></label>
+        <span class="status-pill" id="connectionStatus">Connectant...</span>
+        <label class="file-button">
+          Importar clients Excel
+          <input id="clientFile" type="file" accept=".xlsx,.xls,.csv" />
+        </label>
+        <label class="file-button secondary">
+          Importar places/trasters
+          <input id="unitFile" type="file" accept=".xlsx,.xls,.csv" />
+        </label>
         <button id="exportClients" type="button">Exportar clients</button>
       </div>
     </header>
+    <div class="app-message" id="appMessage" hidden></div>
 
     <main class="layout">
       <aside class="sidebar">
@@ -31,26 +40,72 @@
         <section class="panel">
           <h2>Alta rapida</h2>
           <form id="quickAddForm">
-            <label><span>Nom</span><input id="quickName" required /></label>
-            <label><span>Telefon</span><input id="quickPhone" /></label>
-            <label><span>Email</span><input id="quickEmail" type="email" /></label>
-            <label><span>Interes</span><select id="quickInterest"><option>Placa normal</option><option>Caravana</option><option>Traster</option><option>Placa + traster</option><option>Altres</option></select></label>
+            <label>
+              <span>Nom</span>
+              <input id="quickName" required />
+            </label>
+            <label>
+              <span>Telefon</span>
+              <input id="quickPhone" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input id="quickEmail" type="email" />
+            </label>
+            <label>
+              <span>Interes</span>
+              <select id="quickInterest">
+                <option>Placa normal</option>
+                <option>Caravana</option>
+                <option>Traster</option>
+                <option>Placa + traster</option>
+                <option>Altres</option>
+              </select>
+            </label>
             <button class="primary" type="submit">Afegir client</button>
           </form>
         </section>
 
         <section class="panel">
           <h2>Filtres</h2>
-          <label><span>Cerca</span><input id="searchInput" type="search" placeholder="Nom, telefon, email o placa" /></label>
-          <label><span>Tipus d'interes</span><select id="interestFilter"><option value="">Tots</option><option value="placa normal">Placa normal</option><option value="caravana">Caravana</option><option value="traster">Traster</option><option value="placa + traster">Placa + traster</option><option value="altres">Altres</option></select></label>
-          <label><span>Proper pas</span><select id="nextStepFilter"><option value="">Tots</option><option value="contactar">Contactar</option><option value="esperar resposta">Esperar resposta</option><option value="assignar placa">Assignar placa</option><option value="generar reserva">Generar reserva</option><option value="contracte">Contracte</option></select></label>
+          <label>
+            <span>Cerca</span>
+            <input id="searchInput" type="search" placeholder="Nom, telefon, email o placa" />
+          </label>
+          <label>
+            <span>Tipus d'interes</span>
+            <select id="interestFilter">
+              <option value="">Tots</option>
+              <option value="placa normal">Placa normal</option>
+              <option value="caravana">Caravana</option>
+              <option value="traster">Traster</option>
+              <option value="placa + traster">Placa + traster</option>
+              <option value="altres">Altres</option>
+            </select>
+          </label>
+          <label>
+            <span>Proper pas</span>
+            <select id="nextStepFilter">
+              <option value="">Tots</option>
+              <option value="contactar">Contactar</option>
+              <option value="esperar resposta">Esperar resposta</option>
+              <option value="assignar placa">Assignar placa</option>
+              <option value="generar reserva">Generar reserva</option>
+              <option value="contracte">Contracte</option>
+            </select>
+          </label>
         </section>
       </aside>
 
       <section class="board-shell">
         <div class="board-toolbar">
-          <div><h2>Seguiment comercial</h2><p>Tots els clients importats comencen com a pendents de contactar.</p></div>
-          <button id="resetDemo" type="button">Netejar dades</button>
+          <div>
+            <h2>Seguiment comercial</h2>
+            <p id="dataHint">Tots els clients importats comencen com a pendents de contactar.</p>
+          </div>
+          <div class="toolbar-actions">
+            <button id="resetDemo" type="button">Recarregar dades</button>
+          </div>
         </div>
         <div class="board" id="board"></div>
       </section>
@@ -58,20 +113,83 @@
 
     <dialog id="clientDialog">
       <form method="dialog" class="client-form" id="clientForm">
-        <div class="dialog-header"><div><p class="eyebrow">Fitxa client</p><h2 id="dialogTitle">Client</h2></div><button value="cancel" type="submit">Tancar</button></div>
-        <div class="form-grid">
-          <label><span>Nom</span><input id="clientName" required /></label>
-          <label><span>Telefon</span><input id="clientPhone" /></label>
-          <label><span>Email</span><input id="clientEmail" type="email" /></label>
-          <label><span>Interes</span><select id="clientInterest"><option>Placa normal</option><option>Caravana</option><option>Traster</option><option>Placa + traster</option><option>Altres</option></select></label>
-          <label><span>Estat</span><select id="clientStatus"></select></label>
-          <label><span>Prioritat</span><select id="clientPriority"><option>Normal</option><option>Alta</option><option>Baixa</option></select></label>
-          <label><span>Placa/traster assignat</span><input id="assignedUnit" list="unitList" placeholder="Ex. 101, T-12..." /><datalist id="unitList"></datalist></label>
-          <label><span>Data ultim contacte</span><input id="lastContact" type="date" /></label>
-          <label><span>Proper pas</span><select id="nextStep"><option value="">Sense definir</option><option>Contactar</option><option>Esperar resposta</option><option>Assignar placa</option><option>Generar reserva</option><option>Contracte</option></select></label>
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">Fitxa client</p>
+            <h2 id="dialogTitle">Client</h2>
+          </div>
+          <button class="icon-button" value="cancel" type="submit">Tancar</button>
         </div>
-        <label><span>Comentaris interns</span><textarea id="notes" rows="5" placeholder="Resposta del client, preferencies, avisos..."></textarea></label>
-        <div class="dialog-actions"><button id="deleteClient" class="danger" type="button">Eliminar</button><div><button value="cancel" type="submit">Cancelar</button><button id="saveClient" class="primary" value="default" type="button">Guardar</button></div></div>
+
+        <div class="form-grid">
+          <label>
+            <span>Nom</span>
+            <input id="clientName" required />
+          </label>
+          <label>
+            <span>Telefon</span>
+            <input id="clientPhone" />
+          </label>
+          <label>
+            <span>Email</span>
+            <input id="clientEmail" type="email" />
+          </label>
+          <label>
+            <span>Interes</span>
+            <select id="clientInterest">
+              <option>Placa normal</option>
+              <option>Caravana</option>
+              <option>Traster</option>
+              <option>Placa + traster</option>
+              <option>Altres</option>
+            </select>
+          </label>
+          <label>
+            <span>Estat</span>
+            <select id="clientStatus"></select>
+          </label>
+          <label>
+            <span>Prioritat</span>
+            <select id="clientPriority">
+              <option>Normal</option>
+              <option>Alta</option>
+              <option>Baixa</option>
+            </select>
+          </label>
+          <label>
+            <span>Placa/traster assignat</span>
+            <input id="assignedUnit" list="unitList" placeholder="Ex. 101, T-12..." />
+            <datalist id="unitList"></datalist>
+          </label>
+          <label>
+            <span>Data ultim contacte</span>
+            <input id="lastContact" type="date" />
+          </label>
+          <label>
+            <span>Proper pas</span>
+            <select id="nextStep">
+              <option value="">Sense definir</option>
+              <option>Contactar</option>
+              <option>Esperar resposta</option>
+              <option>Assignar placa</option>
+              <option>Generar reserva</option>
+              <option>Contracte</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          <span>Comentaris interns</span>
+          <textarea id="notes" rows="5" placeholder="Resposta del client, preferencies, avisos..."></textarea>
+        </label>
+
+        <div class="dialog-actions">
+          <button id="deleteClient" class="danger" type="button">Eliminar</button>
+          <div>
+            <button value="cancel" type="submit">Cancelar</button>
+            <button id="saveClient" class="primary" value="default" type="button">Guardar</button>
+          </div>
+        </div>
       </form>
     </dialog>
   </body>
