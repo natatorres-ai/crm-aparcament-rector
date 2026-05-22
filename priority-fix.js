@@ -40,6 +40,31 @@ mapClientToDb = function mapClientToDb(client) {
   };
 };
 
+function fixStatusFilter() {
+  if (!els.nextStepFilter) return;
+  const label = els.nextStepFilter.closest("label");
+  const labelText = label?.querySelector("span");
+  if (labelText) labelText.textContent = "Estat";
+  els.nextStepFilter.innerHTML = [
+    '<option value="">Tots</option>',
+    ...statuses.map((status) => `<option value="${escapeHtml(status)}">${escapeHtml(status)}</option>`),
+  ].join("");
+}
+
+filteredClients = function filteredClients() {
+  return state.clients.filter((client) => {
+    const haystack = [client.name, client.phone, client.email, client.interest, client.assignedUnit, client.notes]
+      .join(" ")
+      .toLowerCase();
+    const searchOk = !state.filters.search || haystack.includes(state.filters.search.toLowerCase());
+    const interestOk = !state.filters.interest || normalizeInterest(client.interest) === state.filters.interest;
+    const statusOk = !state.filters.nextStep || normalizeKey(client.status) === normalizeKey(state.filters.nextStep);
+    return searchOk && interestOk && statusOk;
+  });
+};
+
+fixStatusFilter();
+
 if (typeof refreshFromSupabase === "function") {
   setTimeout(() => {
     refreshFromSupabase().catch((error) => {
