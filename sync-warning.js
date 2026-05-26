@@ -32,6 +32,22 @@ function enableSharedRefreshFallback() {
   setInterval(() => sync("interval"), 10000);
 }
 
+function forceUnitImportsAsCatalogueOnly() {
+  mapUnitatToDb = function mapUnitatToDb(unitat) {
+    return {
+      tipus_unitat: unitat.tipusUnitat || unitat.tipus || "Placa",
+      numero: unitat.numero || unitat.label || "",
+      planta: unitat.planta || "",
+      tipus: unitat.tipus || "",
+      preu: unitat.preu === "" ? null : Number(unitat.preu) || null,
+      estat: "disponible",
+      observacions: unitat.observacions || "",
+      m2: unitat.m2 === "" ? null : Number(unitat.m2) || null,
+      updated_at: new Date().toISOString(),
+    };
+  };
+}
+
 function enableLocalClientsWarning() {
   const legacyKey = "crm-aparcament-rector-v1";
   let autoUploading = false;
@@ -151,6 +167,7 @@ function enableLocalClientsWarning() {
 }
 
 setTimeout(() => {
+  forceUnitImportsAsCatalogueOnly();
   enableSharedRefreshFallback();
   enableLocalClientsWarning();
 }, 0);
