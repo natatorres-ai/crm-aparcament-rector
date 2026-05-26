@@ -48,6 +48,55 @@ function forceUnitImportsAsCatalogueOnly() {
   };
 }
 
+function enableUnitatsExport() {
+  if (document.querySelector("#exportUnitats")?.dataset.ready === "true") return;
+  const button = document.querySelector("#exportUnitats");
+  if (!button) return;
+  button.dataset.ready = "true";
+  button.addEventListener("click", async () => {
+    if (!window.XLSX) {
+      alert("La llibreria d'Excel encara s'esta carregant. Torna-ho a provar en uns segons.");
+      return;
+    }
+    try {
+      setConnectionStatus("Preparant exportacio...", "busy");
+      await refreshFromSupabase();
+      const activeAssignacions = state.assignacions.filter(
+        (assignacio) => !String(assignacio.estat || "").toLowerCase().includes("cancel")
+      );
+      const rows = state.unitats.map((unitat) => {
+        const unitAssignacions = activeAssignacions.filter(
+          (assignacio) => String(assignacio.unitat_id) === String(unitat.id)
+        );
+        const clientNames = unitAssignacions
+          .map((assignacio) => state.clients.find((client) => String(client.id) === String(assignacio.client_id))?.name)
+          .filter(Boolean);
+        return {
+          "Tipus unitat": unitat.tipusUnitat || "",
+          Numero: unitat.numero || unitat.label || "",
+          Planta: unitat.planta || "",
+          Tipus: unitat.tipus || "",
+          m2: unitat.m2 ?? "",
+          Preu: unitat.preu ?? "",
+          Estat: unitat.estat || "",
+          "Client assignat": clientNames.join(" / "),
+          "Estat assignacio": unitAssignacions.map((assignacio) => assignacio.estat || "").filter(Boolean).join(" / "),
+          Observacions: unitat.observacions || "",
+        };
+      });
+      const sheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, "Unitats");
+      XLSX.writeFile(workbook, "crm-aparcament-rector-unitats.xlsx");
+      setConnectionStatus("Conectado a Supabase", "ok");
+      showMessage("Exportacio d'unitats preparada.", "ok");
+    } catch (error) {
+      setConnectionStatus("Error de conexion", "error");
+      showMessage(`No s'han pogut exportar les unitats: ${error.message}`, "error");
+    }
+  });
+}
+
 function enableLocalClientsWarning() {
   const legacyKey = "crm-aparcament-rector-v1";
   let autoUploading = false;
@@ -168,6 +217,7 @@ function enableLocalClientsWarning() {
 
 setTimeout(() => {
   forceUnitImportsAsCatalogueOnly();
+  enableUnitatsExport();
   enableSharedRefreshFallback();
   enableLocalClientsWarning();
 }, 0);
