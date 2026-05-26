@@ -65,6 +65,54 @@ filteredClients = function filteredClients() {
 
 fixStatusFilter();
 
+function enableSharedSupabaseSync() {
+  if (window.__crmSharedSyncEnabled) return;
+  window.__crmSharedSyncEnabled = true;
+
+  let syncing = false;
+  let lastSyncAt = 0;
+
+  async function syncFromSupabase(reason = "auto") {
+    if (syncing || !state.supabaseReady || !supabaseClient) return;
+    if (els.dialog?.open && reason === "interval") return;
+    syncing = true;
+    try {
+      await refreshFromSupabase();
+      lastSyncAt = Date.now();
+    } catch (error) {
+      setConnectionStatus("Error de conexion", "error");
+      showMessage(`No s'han pogut sincronitzar les dades: ${error.message}`);
+    } finally {
+      syncing = false;
+    }
+  }
+
+  function scheduleSync(reason) {
+    const now = Date.now();
+    if (now - lastSyncAt < 2500) return;
+    setTimeout(() => syncFromSupabase(reason), 100);
+  }
+
+  window.addEventListener("focus", () => scheduleSync("focus"));
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) scheduleSync("visible");
+  });
+  setInterval(() => syncFromSupabase("interval"), 15000);
+
+  if (supabaseClient?.channel) {
+    try {
+      supabaseClient
+        .channel("crm-aparcament-rector-sync")
+        .on("postgres_changes", { event: "*", schema: "public", table: "clients" }, () => scheduleSync("clients"))
+        .on("postgres_changes", { event: "*", schema: "public", table: "unitats" }, () => scheduleSync("unitats"))
+        .on("postgres_changes", { event: "*", schema: "public", table: "assignacions" }, () => scheduleSync("assignacions"))
+        .subscribe();
+    } catch {
+      // The interval and focus refresh still keep devices in sync if realtime is unavailable.
+    }
+  }
+}
+
 function enableMultipleUnitAssignments() {
   const isActive = (assignacio) => assignacio && !normalizeKey(assignacio.estat).includes("cancel");
   const unitStatusForClientStatus = (status) => {
@@ -341,6 +389,7 @@ function enableMultipleUnitAssignments() {
 
 if (typeof refreshFromSupabase === "function") {
   setTimeout(() => {
+    enableSharedSupabaseSync();
     enableMultipleUnitAssignments();
     refreshFromSupabase().catch((error) => {
       setConnectionStatus("Error de conexion", "error");
