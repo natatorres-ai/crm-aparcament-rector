@@ -5,12 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>CRM Aparcament Rector</title>
     <link rel="stylesheet" href="./styles.css" />
+    <style>
+      .advanced-actions{position:relative}.advanced-actions summary{min-height:40px;display:inline-flex;align-items:center;border:1px solid var(--accent);border-radius:6px;background:#fff;color:var(--accent);padding:9px 13px;font-weight:750;cursor:pointer;list-style:none}.advanced-actions summary::-webkit-details-marker{display:none}.advanced-actions summary:hover{background:var(--accent-soft)}.advanced-actions div{position:absolute;right:0;top:calc(100% + 8px);z-index:20;display:grid;gap:8px;min-width:230px;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff;box-shadow:var(--shadow)}.advanced-actions:not([open]) div{display:none}.advanced-actions div button,.advanced-actions div .file-button{width:100%;justify-content:center;text-align:center}#migrateLegacy{display:none}
+    </style>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="./app.js?v=20260526-export-unitats" defer></script>
-    <script src="./priority-fix.js?v=20260526-export-unitats" defer></script>
-    <script src="./migration.js?v=20260526-export-unitats" defer></script>
-    <script src="./sync-warning.js?v=20260526-export-unitats" defer></script>
+    <script src="./app.js?v=20260526-advanced-actions" defer></script>
+    <script src="./priority-fix.js?v=20260526-advanced-actions" defer></script>
+    <script src="./migration.js?v=20260526-advanced-actions" defer></script>
+    <script src="./sync-warning.js?v=20260526-advanced-actions" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -24,12 +27,17 @@
           Importar clients Excel
           <input id="clientFile" type="file" accept=".xlsx,.xls,.csv" />
         </label>
-        <label class="file-button secondary">
-          Importar places/trasters
-          <input id="unitFile" type="file" accept=".xlsx,.xls,.csv" />
-        </label>
-        <button id="exportClients" type="button">Exportar clients</button>
         <button id="exportUnitats" type="button">Exportar unitats</button>
+        <details class="advanced-actions">
+          <summary>Opcions avancades</summary>
+          <div>
+            <label class="file-button secondary">
+              Importar places/trasters
+              <input id="unitFile" type="file" accept=".xlsx,.xls,.csv" />
+            </label>
+            <button id="exportClients" type="button">Exportar clients</button>
+          </div>
+        </details>
       </div>
     </header>
     <div class="app-message" id="appMessage" hidden></div>
@@ -44,26 +52,13 @@
         <section class="panel">
           <h2>Alta rapida</h2>
           <form id="quickAddForm">
-            <label>
-              <span>Nom</span>
-              <input id="quickName" required />
-            </label>
-            <label>
-              <span>Telefon</span>
-              <input id="quickPhone" />
-            </label>
-            <label>
-              <span>Email</span>
-              <input id="quickEmail" type="email" />
-            </label>
+            <label><span>Nom</span><input id="quickName" required /></label>
+            <label><span>Telefon</span><input id="quickPhone" /></label>
+            <label><span>Email</span><input id="quickEmail" type="email" /></label>
             <label>
               <span>Interes</span>
               <select id="quickInterest">
-                <option>Placa normal</option>
-                <option>Caravana</option>
-                <option>Traster</option>
-                <option>Placa + traster</option>
-                <option>Altres</option>
+                <option>Placa normal</option><option>Caravana</option><option>Traster</option><option>Placa + traster</option><option>Altres</option>
               </select>
             </label>
             <button class="primary" type="submit">Afegir client</button>
@@ -72,41 +67,23 @@
 
         <section class="panel">
           <h2>Filtres</h2>
-          <label>
-            <span>Cerca</span>
-            <input id="searchInput" type="search" placeholder="Nom, telefon, email o placa" />
-          </label>
+          <label><span>Cerca</span><input id="searchInput" type="search" placeholder="Nom, telefon, email o placa" /></label>
           <label>
             <span>Tipus d'interes</span>
             <select id="interestFilter">
-              <option value="">Tots</option>
-              <option value="placa normal">Placa normal</option>
-              <option value="caravana">Caravana</option>
-              <option value="traster">Traster</option>
-              <option value="placa + traster">Placa + traster</option>
-              <option value="altres">Altres</option>
+              <option value="">Tots</option><option value="placa normal">Placa normal</option><option value="caravana">Caravana</option><option value="traster">Traster</option><option value="placa + traster">Placa + traster</option><option value="altres">Altres</option>
             </select>
           </label>
           <label>
             <span>Estat</span>
             <select id="nextStepFilter">
-              <option value="">Tots</option>
-              <option value="Pendent de contactar">Pendent de contactar</option>
-              <option value="Contactat">Contactat</option>
-              <option value="Interessat">Interessat</option>
-              <option value="No ha contestat">No ha contestat</option>
-              <option value="No interessat">No interessat</option>
-              <option value="Reserva feta">Reserva feta</option>
-              <option value="Contracte signat">Contracte signat</option>
+              <option value="">Tots</option><option value="Pendent de contactar">Pendent de contactar</option><option value="Contactat">Contactat</option><option value="Interessat">Interessat</option><option value="No ha contestat">No ha contestat</option><option value="No interessat">No interessat</option><option value="Reserva feta">Reserva feta</option><option value="Contracte signat">Contracte signat</option>
             </select>
           </label>
         </section>
 
         <section class="panel">
-          <div class="panel-heading-row">
-            <h2>Unitats</h2>
-            <button id="refreshUnitats" type="button">Refrescar</button>
-          </div>
+          <div class="panel-heading-row"><h2>Unitats</h2><button id="refreshUnitats" type="button">Refrescar</button></div>
           <div class="unit-summary" id="unitatsSummary">0 unitats carregades</div>
           <div class="unit-list" id="unitatsList"></div>
         </section>
@@ -114,13 +91,8 @@
 
       <section class="board-shell">
         <div class="board-toolbar">
-          <div>
-            <h2>Seguiment comercial</h2>
-            <p id="dataHint">Tots els clients importats comencen com a pendents de contactar.</p>
-          </div>
-          <div class="toolbar-actions">
-            <button id="resetDemo" type="button">Recarregar dades</button>
-          </div>
+          <div><h2>Seguiment comercial</h2><p id="dataHint">Tots els clients importats comencen com a pendents de contactar.</p></div>
+          <div class="toolbar-actions"><button id="resetDemo" type="button">Recarregar dades</button></div>
         </div>
         <div class="board" id="board"></div>
       </section>
@@ -128,83 +100,20 @@
 
     <dialog id="clientDialog">
       <form method="dialog" class="client-form" id="clientForm">
-        <div class="dialog-header">
-          <div>
-            <p class="eyebrow">Fitxa client</p>
-            <h2 id="dialogTitle">Client</h2>
-          </div>
-          <button class="icon-button" value="cancel" type="submit">Tancar</button>
-        </div>
-
+        <div class="dialog-header"><div><p class="eyebrow">Fitxa client</p><h2 id="dialogTitle">Client</h2></div><button class="icon-button" value="cancel" type="submit">Tancar</button></div>
         <div class="form-grid">
-          <label>
-            <span>Nom</span>
-            <input id="clientName" required />
-          </label>
-          <label>
-            <span>Telefon</span>
-            <input id="clientPhone" />
-          </label>
-          <label>
-            <span>Email</span>
-            <input id="clientEmail" type="email" />
-          </label>
-          <label>
-            <span>Interes</span>
-            <select id="clientInterest">
-              <option>Placa normal</option>
-              <option>Caravana</option>
-              <option>Traster</option>
-              <option>Placa + traster</option>
-              <option>Altres</option>
-            </select>
-          </label>
-          <label>
-            <span>Estat</span>
-            <select id="clientStatus"></select>
-          </label>
-          <label>
-            <span>Prioritat</span>
-            <select id="clientPriority">
-              <option>Normal</option>
-              <option>Alta</option>
-              <option>Baixa</option>
-            </select>
-          </label>
-          <label>
-            <span>Placa/traster assignat</span>
-            <input id="assignedUnit" list="unitList" placeholder="Ex. 101, T-12..." />
-            <datalist id="unitList"></datalist>
-          </label>
-          <label>
-            <span>Data ultim contacte</span>
-            <input id="lastContact" type="date" />
-          </label>
-          <label>
-            <span>Proper pas</span>
-            <select id="nextStep">
-              <option value="">Sense definir</option>
-              <option>Contactar</option>
-              <option>Esperar resposta</option>
-              <option>Assignar placa</option>
-              <option>Generar reserva</option>
-              <option>Contracte</option>
-            </select>
-          </label>
+          <label><span>Nom</span><input id="clientName" required /></label>
+          <label><span>Telefon</span><input id="clientPhone" /></label>
+          <label><span>Email</span><input id="clientEmail" type="email" /></label>
+          <label><span>Interes</span><select id="clientInterest"><option>Placa normal</option><option>Caravana</option><option>Traster</option><option>Placa + traster</option><option>Altres</option></select></label>
+          <label><span>Estat</span><select id="clientStatus"></select></label>
+          <label><span>Prioritat</span><select id="clientPriority"><option>Normal</option><option>Alta</option><option>Baixa</option></select></label>
+          <label><span>Placa/traster assignat</span><input id="assignedUnit" list="unitList" placeholder="Ex. 101, T-12..." /><datalist id="unitList"></datalist></label>
+          <label><span>Data ultim contacte</span><input id="lastContact" type="date" /></label>
+          <label><span>Proper pas</span><select id="nextStep"><option value="">Sense definir</option><option>Contactar</option><option>Esperar resposta</option><option>Assignar placa</option><option>Generar reserva</option><option>Contracte</option></select></label>
         </div>
-
-        <label>
-          <span>Comentaris interns</span>
-          <textarea id="notes" rows="5" placeholder="Resposta del client, preferencies, avisos..."></textarea>
-        </label>
-
-        <div class="dialog-actions">
-          <button id="deleteClient" class="danger" type="button">Eliminar</button>
-          <div>
-            <button value="cancel" type="submit">Cancelar</button>
-            <button id="saveClient" class="primary" value="default" type="button">Guardar</button>
-          </div>
-        </div>
+        <label><span>Comentaris interns</span><textarea id="notes" rows="5" placeholder="Resposta del client, preferencies, avisos..."></textarea></label>
+        <div class="dialog-actions"><button id="deleteClient" class="danger" type="button">Eliminar</button><div><button value="cancel" type="submit">Cancelar</button><button id="saveClient" class="primary" value="default" type="button">Guardar</button></div></div>
       </form>
     </dialog>
   </body>
