@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="./styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-    <script src="./app.js" defer></script>
-    <script src="./priority-fix.js" defer></script>
-    <script src="./migration.js" defer></script>
+    <script src="./app.js?v=20260526-shared-sync-2" defer></script>
+    <script src="./priority-fix.js?v=20260526-shared-sync-2" defer></script>
+    <script src="./migration.js?v=20260526-shared-sync-2" defer></script>
+    <script src="./sync-warning.js?v=20260526-shared-sync-2" defer></script>
   </head>
   <body>
     <header class="topbar">
@@ -86,16 +87,27 @@
             </select>
           </label>
           <label>
-            <span>Proper pas</span>
+            <span>Estat</span>
             <select id="nextStepFilter">
               <option value="">Tots</option>
-              <option value="contactar">Contactar</option>
-              <option value="esperar resposta">Esperar resposta</option>
-              <option value="assignar placa">Assignar placa</option>
-              <option value="generar reserva">Generar reserva</option>
-              <option value="contracte">Contracte</option>
+              <option value="Pendent de contactar">Pendent de contactar</option>
+              <option value="Contactat">Contactat</option>
+              <option value="Interessat">Interessat</option>
+              <option value="No ha contestat">No ha contestat</option>
+              <option value="No interessat">No interessat</option>
+              <option value="Reserva feta">Reserva feta</option>
+              <option value="Contracte signat">Contracte signat</option>
             </select>
           </label>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading-row">
+            <h2>Unitats</h2>
+            <button id="refreshUnitats" type="button">Refrescar</button>
+          </div>
+          <div class="unit-summary" id="unitatsSummary">0 unitats carregades</div>
+          <div class="unit-list" id="unitatsList"></div>
         </section>
       </aside>
 
