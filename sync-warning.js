@@ -34,6 +34,7 @@ function enableSharedRefreshFallback() {
 
 function enableLocalClientsWarning() {
   const legacyKey = "crm-aparcament-rector-v1";
+  let autoUploading = false;
 
   function normalize(value) {
     return String(value || "")
@@ -98,13 +99,51 @@ function enableLocalClientsWarning() {
     notice.querySelector("strong").textContent = `${count} clients locals no compartits`;
   }
 
+  async function uploadPendingClients(pending) {
+    if (autoUploading || !pending.length || !state.supabaseReady || !supabaseClient) return;
+    autoUploading = true;
+    try {
+      setConnectionStatus("Pujant clients locals...", "busy");
+      for (const client of pending) {
+        if (isAlreadyOnline(client)) continue;
+        const saved = await saveClient(
+          makeClient({
+            name: client.name,
+            phone: client.phone,
+            email: client.email,
+            interest: client.interest,
+            status: client.status,
+            priority: client.priority,
+            notes: client.notes,
+            createdAt: client.createdAt,
+          })
+        );
+        state.clients.push(saved);
+      }
+      await refreshFromSupabase();
+      removeNotice();
+      showMessage("Clients locals pujats automaticament a Supabase.", "ok");
+      setConnectionStatus("Conectado a Supabase", "ok");
+    } catch (error) {
+      showNotice(pending.length);
+      setConnectionStatus("Error de conexion", "error");
+      showMessage(`No s'han pogut pujar automaticament els clients locals: ${error.message}`, "error");
+    } finally {
+      autoUploading = false;
+    }
+  }
+
   function check() {
     const pending = getLocalClients().filter((client) => !isAlreadyOnline(client));
     if (!pending.length) {
       removeNotice();
       return;
     }
-    showNotice(pending.length);
+    if (state.supabaseReady && supabaseClient) {
+      uploadPendingClients(pending);
+    } else {
+      showNotice(pending.length);
+    }
   }
 
   setTimeout(check, 2500);
