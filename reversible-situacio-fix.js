@@ -39,6 +39,58 @@ function crmReversibleSituacioFix() {
     return map[situacioValue] || "pendent";
   }
 
+  function isActiveAssignacioLocal(assignacio) {
+    const value = String(assignacio?.estat || "").toLowerCase();
+    return !!assignacio && !value.includes("cancel");
+  }
+
+  function unitLabel(unitat) {
+    if (!unitat) return "";
+    return unitat.label || unitat.numero || unitat.detail || "";
+  }
+
+  function sortUnits(a, b) {
+    const numberA = Number(String(a.label || "").match(/\d+/)?.[0] || 0);
+    const numberB = Number(String(b.label || "").match(/\d+/)?.[0] || 0);
+    if (numberA && numberB && numberA !== numberB) return numberA - numberB;
+    return String(a.label || "").localeCompare(String(b.label || ""));
+  }
+
+  function assignedTextForCard(client) {
+    const units = client?.assignedUnits || [];
+    if (!units.length) return client?.assignedUnit || "";
+    if (units.length === 1) return units[0].label;
+    const preview = units.slice(0, 4).map((unitat) => unitat.label).join(", ");
+    return `${units.length} unitats: ${preview}${units.length > 4 ? "..." : ""}`;
+  }
+
+  function enrichAllAssignedUnits() {
+    if (!state?.clients || !state?.assignacions || !state?.unitats) return;
+    state.clients.forEach((client) => {
+      const assignacions = state.assignacions.filter(
+        (assignacio) => String(assignacio.client_id) === String(client.id) && isActiveAssignacioLocal(assignacio)
+      );
+      const assignedUnits = assignacions
+        .map((assignacio) => {
+          const unitat = state.unitats.find((item) => String(item.id) === String(assignacio.unitat_id));
+          if (!unitat) return null;
+          return {
+            assignacioId: assignacio.id,
+            unitatId: unitat.id,
+            label: unitLabel(unitat),
+            detail: unitat.detail || [unitat.numero, unitat.planta ? `planta ${unitat.planta}` : "", unitat.tipus]
+              .filter(Boolean)
+              .join(" - "),
+            estat: assignacio.estat || unitat.estat || client.status,
+          };
+        })
+        .filter(Boolean)
+        .sort(sortUnits);
+      client.assignedUnits = assignedUnits;
+      client.assignedUnit = assignedUnits.map((unitat) => unitat.label).join(", ");
+    });
+  }
+
   if (typeof mapClientToDb === "function") {
     mapClientToDb = function mapClientToDb(client) {
       const status = normalizedStatus(client.status);
@@ -59,13 +111,25 @@ function crmReversibleSituacioFix() {
     };
   }
 
+  enrichAssignedUnits = function enrichAssignedUnits() {
+    enrichAllAssignedUnits();
+  };
+
   if (typeof filteredClients === "function") {
     filteredClients = function filteredClients() {
       return state.clients.filter((client) => {
         const status = normalizedStatus(client.status);
         const situacio = normalizedSituacio(client.situacio, client.status);
         if (status === "pendent" && situacio === "no_interessat" && !state.filters.showNoInteressats) return false;
-        const haystack = [client.name, client.phone, client.email, client.interest, client.assignedUnit, client.notes]
+        const haystack = [
+          client.name,
+          client.phone,
+          client.email,
+          client.interest,
+          client.assignedUnit,
+          (client.assignedUnits || []).map((unitat) => unitat.label).join(" "),
+          client.notes,
+        ]
           .join(" ")
           .toLowerCase();
         const searchOk = !state.filters.search || haystack.includes(state.filters.search.toLowerCase());
@@ -76,9 +140,73 @@ function crmReversibleSituacioFix() {
     };
   }
 
+  if (typeof renderCard === "function") {
+    renderCard = function renderCard(client) {
+      const contact = [client.phone, client.email].filter(Boolean).join(" - ");
+      const assignedText = assignedTextForCard(client);
+      const assigned = assignedText ? `<span class="pill warn">${escapeHtml(assignedText)}</span>` : "";
+      const situacio = normalizedSituacio(client.situacio, client.status);
+      const showSituacio = normalizedStatus(client.status) === "pendent" && situacio !== "pendent_de_contactar";
+      const situacioClass = situacio === "no_interessat" ? "pill situacio-pill alert" : "pill situacio-pill";
+      const situacioPill = showSituacio ? `<span class="${situacioClass}">${escapeHtml(labelForSituacio(situacio))}</span>` : "";
+      return `
+        <button class="card" type="button" data-id="${escapeHtml(client.id)}">
+          <span class="card-title"><span>${escapeHtml(client.name)}</span></span>
+          <span class="card-meta">${escapeHtml(contact || "Sense contacte")}</span>
+          <span class="card-meta">${escapeHtml(client.interest)}</span>
+          <span class="pill-row">${situacioPill}${assigned}</span>
+        </button>
+      `;
+    };
+  }
+
+  function renderAssignedUnitsList(clientId) {
+    const input = els?.assignedUnit;
+    const label = input?.closest("label");
+    if (!input || !label) return;
+    let list = document.querySelector("#assignedUnitsList");
+    if (!list) {
+      list = document.createElement("div");
+      list.id = "assignedUnitsList";
+      list.className = "assigned-units-list";
+      label.appendChild(list);
+    }
+    els.assignedUnitsList = list;
+    const client = state.clients.find((item) => String(item.id) === String(clientId));
+    const units = client?.assignedUnits || [];
+    list.innerHTML = units.length
+      ? units
+          .map(
+            (unitat) => `
+              <div class="assigned-unit-row">
+                <span>${escapeHtml(unitat.label)}<small>${escapeHtml(unitat.estat || "assignada")}</small></span>
+                <button type="button" data-cancel-assignacio="${escapeHtml(unitat.assignacioId)}">Treure</button>
+              </div>
+            `
+          )
+          .join("")
+      : `<div class="empty">Cap unitat assignada</div>`;
+    list.querySelectorAll("[data-cancel-assignacio]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        if (!confirm("Vols treure aquesta unitat del client?")) return;
+        try {
+          await cancelAssignacio(button.dataset.cancelAssignacio);
+          await refreshFromSupabase();
+          enrichAllAssignedUnits();
+          renderAssignedUnitsList(clientId);
+          render();
+        } catch (error) {
+          setConnectionStatus("Error de conexion", "error");
+          showMessage(`No s'ha pogut desassignar la unitat: ${error.message}`);
+        }
+      });
+    });
+  }
+
   if (typeof openClient === "function") {
     const previousOpenClient = openClient;
     openClient = function openClient(id) {
+      enrichAllAssignedUnits();
       previousOpenClient(id);
       if (!els?.clientStatus || !els?.clientSituacio) return;
       els.clientStatus.onchange = () => {
@@ -86,6 +214,7 @@ function crmReversibleSituacioFix() {
           els.clientSituacio.value = "pendent_de_contactar";
         }
       };
+      renderAssignedUnitsList(id);
     };
   }
 
@@ -99,6 +228,7 @@ function crmReversibleSituacioFix() {
     };
   }
 
+  enrichAllAssignedUnits();
   if (typeof render === "function") render();
 }
 
