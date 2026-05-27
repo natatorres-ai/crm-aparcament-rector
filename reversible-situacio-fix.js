@@ -20,9 +20,7 @@ function crmReversibleSituacioFix() {
   function cleanSituacioForStatus(status, situacio) {
     const statusValue = normalizedStatus(status);
     const situacioValue = normalizedSituacio(situacio, statusValue);
-    if (statusValue !== "pendent" && situacioValue === "no_interessat") {
-      return "pendent_de_contactar";
-    }
+    if (statusValue !== "pendent" && situacioValue === "no_interessat") return "pendent_de_contactar";
     return situacioValue;
   }
 
@@ -89,6 +87,35 @@ function crmReversibleSituacioFix() {
       client.assignedUnits = assignedUnits;
       client.assignedUnit = assignedUnits.map((unitat) => unitat.label).join(", ");
     });
+  }
+
+  async function updateActiveAssignmentsStatus(clientId, status) {
+    if (!window.supabaseClient && typeof supabaseClient === "undefined") return;
+    if (!state?.assignacions) return;
+    const active = state.assignacions.filter(
+      (assignacio) => String(assignacio.client_id) === String(clientId) && isActiveAssignacioLocal(assignacio)
+    );
+    const unitatStatus = normalizedStatus(status) === "contracte_signat" ? "llogada" : "reservada";
+    for (const assignacio of active) {
+      const { error: assignError } = await supabaseClient
+        .from("assignacions")
+        .update({
+          estat: normalizedStatus(status),
+          reserva_pagada: normalizedStatus(status) === "reserva_feta" || normalizedStatus(status) === "contracte_signat",
+          contracte_generat: normalizedStatus(status) === "contracte_signat",
+          contracte_signat: normalizedStatus(status) === "contracte_signat",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", assignacio.id);
+      if (assignError) throw assignError;
+      if (assignacio.unitat_id) {
+        const { error: unitError } = await supabaseClient
+          .from("unitats")
+          .update({ estat: unitatStatus, updated_at: new Date().toISOString() })
+          .eq("id", assignacio.unitat_id);
+        if (unitError) throw unitError;
+      }
+    }
   }
 
   if (typeof mapClientToDb === "function") {
@@ -218,14 +245,68 @@ function crmReversibleSituacioFix() {
     };
   }
 
-  if (typeof saveSelectedClient === "function") {
-    const previousSaveSelectedClient = saveSelectedClient;
-    saveSelectedClient = async function saveSelectedClient() {
-      if (els?.clientStatus && els?.clientSituacio) {
-        els.clientSituacio.value = cleanSituacioForStatus(els.clientStatus.value, els.clientSituacio.value);
-      }
-      return previousSaveSelectedClient();
+  async function reliableSaveSelectedClient() {
+    const client = state.clients.find((item) => String(item.id) === String(state.selectedId));
+    if (!client) return;
+    const status = normalizedStatus(els.clientStatus.value);
+    const situacio = cleanSituacioForStatus(status, els.clientSituacio?.value);
+    if (els.clientSituacio) els.clientSituacio.value = situacio;
+    const unitatToAdd = els.assignedUnit?.value.trim() || "";
+    const draft = {
+      ...client,
+      name: els.clientName.value.trim() || "Sense nom",
+      phone: els.clientPhone.value.trim(),
+      email: els.clientEmail.value.trim(),
+      interest: els.clientInterest.value,
+      status,
+      situacio,
+      priority: els.clientPriority?.value || client.priority,
+      lastContact: els.lastContact?.value || "",
+      nextStep: els.nextStep?.value || "",
+      notes: els.notes.value.trim(),
     };
+    try {
+      setConnectionStatus("Guardando...", "busy");
+      const updated = await updateClient(draft);
+      Object.assign(updated, {
+        status: draft.status,
+        situacio: draft.situacio,
+        lastContact: draft.lastContact,
+        nextStep: draft.nextStep,
+      });
+      state.clients = state.clients.map((item) => (String(item.id) === String(updated.id) ? updated : item));
+      if (unitatToAdd) {
+        const unitat = findUnitatByLabel(unitatToAdd);
+        if (!unitat) throw new Error("No he trobat aquesta unitat disponible.");
+        await saveAssignacio(updated, unitat);
+        els.assignedUnit.value = "";
+      }
+      await updateActiveAssignmentsStatus(updated.id, updated.status);
+      await refreshFromSupabase();
+      enrichAllAssignedUnits();
+      render();
+      els.dialog.close();
+      setConnectionStatus("Guardado", "ok");
+    } catch (error) {
+      setConnectionStatus("Error de conexion", "error");
+      showMessage(`No s'ha pogut guardar el client: ${error.message}`);
+    }
+  }
+
+  saveSelectedClient = reliableSaveSelectedClient;
+
+  if (!window.__crmReliableSaveInstalled) {
+    window.__crmReliableSaveInstalled = true;
+    document.addEventListener(
+      "click",
+      (event) => {
+        if (!event.target?.closest?.("#saveClient")) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        reliableSaveSelectedClient();
+      },
+      true
+    );
   }
 
   enrichAllAssignedUnits();
