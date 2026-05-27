@@ -62,6 +62,37 @@ function crmReversibleSituacioFix() {
     return `${units.length} unitats: ${preview}${units.length > 4 ? "..." : ""}`;
   }
 
+  function ensureSituacioFilter() {
+    if (!state.filters) state.filters = {};
+    if (document.querySelector("#situacioFilter")) {
+      els.situacioFilter = document.querySelector("#situacioFilter");
+      return;
+    }
+    const statusLabel = els.nextStepFilter?.closest("label");
+    if (!statusLabel) return;
+    const label = document.createElement("label");
+    label.innerHTML = `
+      <span>Situació</span>
+      <select id="situacioFilter">
+        <option value="">Totes</option>
+        <option value="pendent_de_contactar">Pendent de contactar</option>
+        <option value="contactat">Contactat</option>
+        <option value="no_contesta">No contesta</option>
+        <option value="no_interessat">No interessat</option>
+      </select>
+    `;
+    statusLabel.insertAdjacentElement("afterend", label);
+    els.situacioFilter = label.querySelector("#situacioFilter");
+    els.situacioFilter.addEventListener("change", () => {
+      state.filters.situacio = els.situacioFilter.value;
+      if (els.situacioFilter.value === "no_interessat" && els.showNoInteressats) {
+        els.showNoInteressats.checked = true;
+        state.filters.showNoInteressats = true;
+      }
+      render();
+    });
+  }
+
   function enrichAllAssignedUnits() {
     if (!state?.clients || !state?.assignacions || !state?.unitats) return;
     state.clients.forEach((client) => {
@@ -142,30 +173,29 @@ function crmReversibleSituacioFix() {
     enrichAllAssignedUnits();
   };
 
-  if (typeof filteredClients === "function") {
-    filteredClients = function filteredClients() {
-      return state.clients.filter((client) => {
-        const status = normalizedStatus(client.status);
-        const situacio = normalizedSituacio(client.situacio, client.status);
-        if (status === "pendent" && situacio === "no_interessat" && !state.filters.showNoInteressats) return false;
-        const haystack = [
-          client.name,
-          client.phone,
-          client.email,
-          client.interest,
-          client.assignedUnit,
-          (client.assignedUnits || []).map((unitat) => unitat.label).join(" "),
-          client.notes,
-        ]
-          .join(" ")
-          .toLowerCase();
-        const searchOk = !state.filters.search || haystack.includes(state.filters.search.toLowerCase());
-        const interestOk = !state.filters.interest || normalizeInterest(client.interest) === state.filters.interest;
-        const statusOk = !state.filters.nextStep || status === normalizedStatus(state.filters.nextStep);
-        return searchOk && interestOk && statusOk;
-      });
-    };
-  }
+  filteredClients = function filteredClients() {
+    return state.clients.filter((client) => {
+      const status = normalizedStatus(client.status);
+      const situacio = normalizedSituacio(client.situacio, client.status);
+      if (status === "pendent" && situacio === "no_interessat" && !state.filters.showNoInteressats) return false;
+      const haystack = [
+        client.name,
+        client.phone,
+        client.email,
+        client.interest,
+        client.assignedUnit,
+        (client.assignedUnits || []).map((unitat) => unitat.label).join(" "),
+        client.notes,
+      ]
+        .join(" ")
+        .toLowerCase();
+      const searchOk = !state.filters.search || haystack.includes(state.filters.search.toLowerCase());
+      const interestOk = !state.filters.interest || normalizeInterest(client.interest) === state.filters.interest;
+      const statusOk = !state.filters.nextStep || status === normalizedStatus(state.filters.nextStep);
+      const situacioOk = !state.filters.situacio || situacio === state.filters.situacio;
+      return searchOk && interestOk && statusOk && situacioOk;
+    });
+  };
 
   if (typeof renderCard === "function") {
     renderCard = function renderCard(client) {
@@ -309,6 +339,7 @@ function crmReversibleSituacioFix() {
     );
   }
 
+  ensureSituacioFilter();
   enrichAllAssignedUnits();
   if (typeof render === "function") render();
 }
