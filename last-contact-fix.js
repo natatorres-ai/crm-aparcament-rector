@@ -18,6 +18,8 @@
     return lastContactColumnReady;
   }
 
+  // Other compatibility fixes replace the save mapping shortly after page load.
+  // Install this wrapper afterwards so the date is always included in the final save.
   setTimeout(() => {
     const previousFromDb = mapClientFromDb;
     const previousToDb = mapClientToDb;
@@ -39,5 +41,6 @@
     detectLastContactColumn().then(() => refreshFromSupabase()).catch((error) => {
       showMessage(`No s'ha pogut preparar la data de contacte: ${error.message}`, "warning");
     });
-  }, 0);
+  }, 120);
 })();
+
